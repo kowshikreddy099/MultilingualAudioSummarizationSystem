@@ -15,6 +15,31 @@ const FEATURES = [
   { icon: '💬', label: 'Key Quotes' },
 ];
 
+function parseSseBlock(block) {
+  let event = 'message';
+  const dataLines = [];
+
+  for (const line of block.split(/\r?\n/)) {
+    if (line.startsWith('event:')) event = line.slice(6).trim();
+    if (line.startsWith('data:')) dataLines.push(line.slice(5).replace(/^ /, ''));
+  }
+
+  if (!dataLines.length) return null;
+  return { event, data: JSON.parse(dataLines.join('\n')) };
+}
+
+function responseErrorMessage(body, status) {
+  const dataLine = body.split(/\r?\n/).find((line) => line.startsWith('data:'));
+  if (dataLine) {
+    try {
+      const data = JSON.parse(dataLine.slice(5).trim());
+      if (data?.message) return data.message;
+    } catch {}
+  }
+
+  return `The processing server responded with status ${status}. Please try again.`;
+}
+
 export default function HomePage() {
   const [file, setFile] = useState(null);
   const [targetLanguage, setTargetLanguage] = useState('english');
@@ -36,10 +61,13 @@ export default function HomePage() {
     if (!file) return;
     reset();
     setStatus('loading');
+    setCurrentStage('uploading');
 
     const formData = new FormData();
     formData.append('audio', file);
     formData.append('lang', targetLanguage);
+
+    let receivedError = false;
 
     try {
       const res = await fetch('/api/summarize', {
@@ -47,6 +75,9 @@ export default function HomePage() {
         body: formData,
       });
 
+      if (!res.ok) {
+        throw new Error(responseErrorMessage(await res.text(), res.status));
+      }
       if (!res.body) {
         throw new Error('ReadableStream not supported by the browser.');
       }
@@ -54,22 +85,22 @@ export default function HomePage() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let completed = false;
 
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() ?? ''; // keep the last partial chunk
+        const blocks = buffer.split(/\r?\n\r?\n/);
+        buffer = blocks.pop() ?? '';
 
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          const [eventTypeStr, dataStr] = line.split('\ndata: ');
-          if (!eventTypeStr || !dataStr) continue;
+        for (const block of blocks) {
+          if (!block.trim()) continue;
+          const message = parseSseBlock(block);
+          if (!message) continue;
 
-          const eventType = eventTypeStr.replace('event: ', '').trim();
-          const data = JSON.parse(dataStr);
+          const { event: eventType, data } = message;
 
           if (eventType === 'stage') {
             setCurrentStage(data.stage);
@@ -80,20 +111,28 @@ export default function HomePage() {
               setSections((prev) => ({ ...prev, [data.name]: data.content }));
             }
           } else if (eventType === 'error') {
+            receivedError = true;
             setErrorMessage(data.message ?? 'Something went wrong.');
             setStatus('error');
+            await reader.cancel();
+            return;
           } else if (eventType === 'done') {
-            if (status !== 'error') setStatus('done');
+            completed = true;
           }
         }
       }
+
+      if (!completed) {
+        throw new Error('Processing stopped before the analysis was completed. Please try again.');
+      }
+      setStatus('done');
     } catch (err) {
-      if (status !== 'done' && status !== 'error') {
-        setErrorMessage('Failed to connect to the processing server. Please check your connection and try again.');
+      if (!receivedError) {
+        setErrorMessage(err instanceof Error ? err.message : 'Failed to connect to the processing server.');
         setStatus('error');
       }
     }
-  }, [file, targetLanguage, reset, status]);
+  }, [file, targetLanguage, reset]);
 
   const isActive = status === 'loading' || status === 'done' || status === 'error';
   const hasResults = Object.keys(sections).length > 0;
@@ -111,7 +150,7 @@ export default function HomePage() {
             Summarize Any<br />Audio File
           </h1>
           <p className="hero__subtitle">
-            Upload an MP3 or WAV file and get instant speaker-attributed summaries,
+            Upload an MP3 or WAV file and get speaker-aware summaries when the source supports it,
             topic segments, action items, and multilingual translation.
           </p>
           <div className="hero__features" role="list" aria-label="Features">
@@ -149,7 +188,7 @@ export default function HomePage() {
           setFile={setFile}
           targetLanguage={targetLanguage}
           setTargetLanguage={setTargetLanguage}
-          onSubmit={() => { reset(); setTimeout(handleSubmit, 50); }}
+          onSubmit={handleSubmit}
           isLoading={status === 'loading'}
           compact
         />

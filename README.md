@@ -59,7 +59,7 @@ The API route is implemented in `app/api/summarize/route.js`. It requires a serv
    npm ci
    ```
 
-3. Create a `.env.local` file in the same folder:
+3. Create a `.env.local` file in the same folder with the **real** URLs for your deployed Hugging Face Spaces:
 
    ```env
    HF_SPACE_ASR_URL=https://your-asr-space.hf.space
@@ -67,7 +67,7 @@ The API route is implemented in `app/api/summarize/route.js`. It requires a serv
    HF_TOKEN=hf_your_token_here
    ```
 
-4. Replace the placeholder URLs with the actual Hugging Face Space URLs. Do not add a trailing slash.
+4. Replace both placeholder URLs. `https://your-asr-space.hf.space` and `https://your-summarizer-space.hf.space` are examples only; leaving either value unchanged prevents the app from analyzing audio. Do not add a trailing slash.
 
 5. Start the application:
 
@@ -87,6 +87,17 @@ The API route is implemented in `app/api/summarize/route.js`. It requires a serv
 
 Keep `.env.local` private. Never commit it to GitHub or expose `HF_TOKEN` in browser-side variables.
 
+## Required Hugging Face Space APIs
+
+The application cannot analyze audio until both services are deployed and their actual URLs are configured.
+
+| Service | Required Gradio API | Input | Accepted output |
+| --- | --- | --- | --- |
+| ASR Space | `transcribe` | One Gradio `FileData` audio object | `[transcriptText, metadata]` or an object containing `text`/`transcript` plus optional language, duration, and segments |
+| Summarizer Space | `summarize` | `transcriptJson`, `targetLanguage` | A JSON object containing one or more analysis sections, such as `concise_summary`, `detailed_summary`, `topics`, or `action_items` |
+
+The route supports Gradio queue-based Spaces. It shows the exact upstream error in the interface if upload, transcription, or summarization fails. Audio files are limited to 25 MB to keep the server-side upload reliable; use a short MP3 or WAV for a live demo.
+
 ## Deployment
 
 The project is deployed at:
@@ -101,7 +112,7 @@ For a new Vercel deployment:
 4. Add the environment variables in Vercel’s **Project Settings → Environment Variables**.
 5. Deploy and test with a short audio file.
 
-The summarization route has a five-minute execution limit, so long audio may time out. Test with a short MP3 or WAV file first.
+The summarization route has a five-minute execution limit, so long audio may time out. Configure `HF_SPACE_ASR_URL`, `HF_SPACE_SUMMARIZER_URL`, and `HF_TOKEN` in Vercel before testing with a short MP3 or WAV file.
 
 ## Project Structure
 
