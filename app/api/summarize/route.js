@@ -35,6 +35,12 @@ function streamError(message, status = 500) {
 }
 
 function errorDetails(prefix, status, body = '') {
+  if (status === 401) {
+    return `${prefix} rejected HF_TOKEN. Update the token in Vercel and enable its Inference Providers permission.`;
+  }
+  if (status === 403) {
+    return `${prefix} denied access. Confirm that HF_TOKEN has Inference Providers permission and sufficient provider access.`;
+  }
   const detail = body
     .replace(/<[^>]*>/g, ' ')
     .replace(/\s+/g, ' ')
