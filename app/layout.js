@@ -8,13 +8,11 @@ const inter = Inter({
 });
 
 export const metadata = {
-  title: 'MLYTAS | Multilingual YouTube Audio Summarizer',
+  title: 'MLYTAS | Multilingual Audio Summarizer',
   description:
-    'Summarize any YouTube video in seconds. Get speaker diarization, topic segmentation, actionable insights, and multilingual translation powered by Whisper V3 and AI.',
+    'Transcribe and summarize audio files with topic segments, action items, and multilingual translation powered by Whisper and AI.',
   keywords: [
-    'YouTube summarizer',
     'audio transcription',
-    'speaker diarization',
     'multilingual',
     'AI summarization',
     'Whisper',
@@ -23,15 +21,15 @@ export const metadata = {
   ],
   authors: [{ name: 'MLYTAS' }],
   openGraph: {
-    title: 'MLYTAS | Multilingual YouTube Audio Summarizer',
-    description: 'Summarize any YouTube video in seconds with AI-powered transcription, speaker identification, and multilingual translation.',
+    title: 'MLYTAS | Multilingual Audio Summarizer',
+    description: 'Transcribe audio files and generate AI-powered summaries, topic segments, and multilingual translation.',
     type: 'website',
     locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'MLYTAS | YouTube Audio Summarizer',
-    description: 'AI-powered YouTube video summarization with speaker diarization and multilingual support.',
+    title: 'MLYTAS | Multilingual Audio Summarizer',
+    description: 'AI-powered audio transcription, summary, and multilingual translation.',
   },
 };
 

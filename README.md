@@ -1,75 +1,54 @@
 # MLYTAS — Multilingual Audio Summarization System
 
-Upload an audio file and receive a transcript plus structured, multilingual AI summaries. The application sends the audio to a Hugging Face transcription service, then sends the resulting transcript to a Hugging Face summarization service.
+Upload an audio file to receive a Whisper transcript, structured summary, topic segments, action items, key quotes, and a translation. The application uses Hugging Face Inference Providers directly—no separately deployed Gradio Spaces are required.
 
 ## Live Demo
 
 **[Open the live application](https://multilingual-audio-summarization-sy-sigma.vercel.app)**
 
-> The live demo is deployed on Vercel. GitHub Pages can display a static site, but it cannot run this project's server-side summarization route.
+> The app needs a valid Hugging Face token in Vercel before it can process audio.
 
 ## Features
 
-- Audio-file upload through the browser
-- Transcription using a connected Hugging Face ASR service
-- Speaker-aware transcript data when supplied by the ASR service
+- MP3, WAV, M4A, OGG, FLAC, AAC, and WebM upload (up to 25 MB)
+- Whisper Large V3 transcription with timestamp data
 - Concise and detailed summaries
-- Topic segments, action items, speaker insights, and key quotes
+- Topic segments, action items, and key quotes
 - Translation into English, Hindi, Spanish, French, German, Chinese, Japanese, Arabic, Portuguese, Korean, Telugu, and Tamil
-- Streaming progress and results in the interface
+- Faithful speaker reporting: it does not invent speaker identities when they are not present in the transcript
+- Streaming progress and useful error messages
 
-## How It Works
+## How it works
 
 ```text
 Audio file
    ↓
 Next.js API route (/api/summarize)
    ↓
-Hugging Face ASR Space (transcribe)
+Hugging Face Whisper ASR
    ↓
-Hugging Face summarizer Space (summarize)
+Hugging Face structured AI analysis
    ↓
-Structured results in the browser
+Results in the browser
 ```
 
-The API route is implemented in `app/api/summarize/route.js`. It requires a server-capable host such as Vercel.
+## Run locally
 
-## Technology
-
-- Next.js 14.2.15
-- React 18.3.1
-- React DOM 18.3.1
-- Hugging Face Spaces using the Gradio queue API
-
-## Run Locally
-
-### Prerequisites
-
-- Node.js 18.17.0 or later
-- npm
-- Access to the two required Hugging Face Spaces
-
-### Installation
-
-1. Clone or download the repository.
-
-2. In the folder containing `package.json`, install dependencies:
+1. Install Node.js 18.17 or later and npm.
+2. Install dependencies:
 
    ```powershell
    npm ci
    ```
 
-3. Create a `.env.local` file in the same folder with the **real** URLs for your deployed Hugging Face Spaces:
+3. Create `.env.local`:
 
    ```env
-   HF_SPACE_ASR_URL=https://your-asr-space.hf.space
-   HF_SPACE_SUMMARIZER_URL=https://your-summarizer-space.hf.space
    HF_TOKEN=hf_your_token_here
    ```
 
-4. Replace both placeholder URLs. `https://your-asr-space.hf.space` and `https://your-summarizer-space.hf.space` are examples only; leaving either value unchanged prevents the app from analyzing audio. Do not add a trailing slash.
-
-5. Start the application:
+4. Create the token in Hugging Face settings with **Inference Providers** permission. Keep it server-side; do not commit `.env.local`.
+5. Start the project:
 
    ```powershell
    npm run dev
@@ -77,59 +56,29 @@ The API route is implemented in `app/api/summarize/route.js`. It requires a serv
 
 6. Open [http://localhost:3000](http://localhost:3000).
 
-## Environment Variables
+## Environment variables
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `HF_SPACE_ASR_URL` | Yes | Base URL of the Hugging Face ASR Space. It must expose a `transcribe` API. |
-| `HF_SPACE_SUMMARIZER_URL` | Yes | Base URL of the Hugging Face summarizer Space. It must expose a `summarize` API. |
-| `HF_TOKEN` | Usually | Hugging Face bearer token used when either Space is private or protected. |
+| `HF_TOKEN` | Yes | Hugging Face token with Inference Providers permission. |
+| `HF_ASR_MODEL` | No | Override the default ASR model: `openai/whisper-large-v3-turbo`. |
+| `HF_SUMMARIZER_MODEL` | No | Override the analysis model: `Qwen/Qwen3-32B:fastest`. |
 
-Keep `.env.local` private. Never commit it to GitHub or expose `HF_TOKEN` in browser-side variables.
+## Accuracy and privacy
 
-## Required Hugging Face Space APIs
-
-The application cannot analyze audio until both services are deployed and their actual URLs are configured.
-
-| Service | Required Gradio API | Input | Accepted output |
-| --- | --- | --- | --- |
-| ASR Space | `transcribe` | One Gradio `FileData` audio object | `[transcriptText, metadata]` or an object containing `text`/`transcript` plus optional language, duration, and segments |
-| Summarizer Space | `summarize` | `transcriptJson`, `targetLanguage` | A JSON object containing one or more analysis sections, such as `concise_summary`, `detailed_summary`, `topics`, or `action_items` |
-
-The route supports Gradio queue-based Spaces. It shows the exact upstream error in the interface if upload, transcription, or summarization fails. Audio files are limited to 25 MB to keep the server-side upload reliable; use a short MP3 or WAV for a live demo.
+The app asks Whisper for timestamps, then asks the analysis model for a strict JSON response. Its prompt explicitly prohibits invented speakers, timestamps, action items, and quotes. The uploaded audio is sent only from the server to Hugging Face Inference Providers for processing; do not upload recordings you are not permitted to process.
 
 ## Deployment
 
-The project is deployed at:
+Deploy on Vercel with the Next.js preset and add `HF_TOKEN` in **Project Settings → Environment Variables**. The token must have Inference Providers permission. Redeploy after changing environment variables.
 
-**[https://multilingual-audio-summarization-sy-sigma.vercel.app](https://multilingual-audio-summarization-sy-sigma.vercel.app)**
+The route has a five-minute execution limit, so short audio is best for the live demo.
 
-For a new Vercel deployment:
-
-1. Import the GitHub repository into Vercel.
-2. Set the Root Directory to the folder containing `package.json`.
-3. Select the Next.js framework preset.
-4. Add the environment variables in Vercel’s **Project Settings → Environment Variables**.
-5. Deploy and test with a short audio file.
-
-The summarization route has a five-minute execution limit, so long audio may time out. Configure `HF_SPACE_ASR_URL`, `HF_SPACE_SUMMARIZER_URL`, and `HF_TOKEN` in Vercel before testing with a short MP3 or WAV file.
-
-## Project Structure
-
-```text
-app/
-  api/summarize/route.js  # Upload, transcription, and summarization pipeline
-  page.js                 # Main upload and results interface
-components/               # User-interface components
-lib/constants.js          # Languages, result sections, and UI metadata
-next.config.mjs           # Next.js configuration
-```
-
-## Available Commands
+## Commands
 
 | Command | Description |
 | --- | --- |
-| `npm run dev` | Start the local development server |
+| `npm run dev` | Start development mode |
 | `npm run build` | Create a production build |
-| `npm run start` | Start the production server after building |
-| `npm run lint` | Run the configured Next.js lint command |
+| `npm run start` | Start the production build |
+| `npm run lint` | Run the configured linter |

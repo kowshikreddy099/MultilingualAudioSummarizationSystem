@@ -144,7 +144,7 @@ export default function HomePage() {
         <section className="hero" aria-labelledby="hero-title">
           <div className="hero__badge">
             <span className="hero__badge-dot" aria-hidden="true" />
-            Powered by Whisper V3 · Groq · pyannote
+            Powered by Whisper Large V3 · Structured AI
           </div>
           <h1 className="hero__title" id="hero-title">
             Summarize Any<br />Audio File
