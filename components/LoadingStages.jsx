@@ -3,8 +3,13 @@ import { PIPELINE_STAGES } from '../lib/constants';
 const STAGE_ICONS = {
   downloading: '⬇️',
   transcribing: '🎙️',
-  diarizing: '👥',
   summarizing: '✨',
+};
+
+const STAGE_DESCRIPTIONS = {
+  downloading: 'Loading the browser-safe Whisper model…',
+  transcribing: 'Processing with on-device Whisper…',
+  summarizing: 'Creating a faithful summary from the transcript…',
 };
 
 function getStageState(stageId, currentStage) {
@@ -36,7 +41,7 @@ export default function LoadingStages({ currentStage, isVisible }) {
               <div className="loading-stage__info">
                 <div className="loading-stage__label">{stage.label}</div>
                 {state === 'active' && (
-                  <div className="loading-stage__desc">{stage.description}</div>
+                  <div className="loading-stage__desc">{STAGE_DESCRIPTIONS[stage.id] ?? stage.description}</div>
                 )}
               </div>
             </div>

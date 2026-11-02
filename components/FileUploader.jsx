@@ -22,6 +22,8 @@ export default function FileUploader({
   setFile,
   targetLanguage,
   setTargetLanguage,
+  processingMode,
+  setProcessingMode,
   onSubmit,
   isLoading,
   compact = false,
@@ -102,24 +104,44 @@ export default function FileUploader({
       </form>
 
       {!compact && (
-        <div className="language-row">
-          <label htmlFor="language-select" className="language-label">
-            Translate summary to:
-          </label>
-          <select
-            id="language-select"
-            className="language-select"
-            value={targetLanguage}
-            onChange={(e) => setTargetLanguage(e.target.value)}
-            disabled={isLoading}
-          >
-            {SUPPORTED_LANGUAGES.map((lang) => (
-              <option key={lang.value} value={lang.value}>
-                {lang.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <>
+          <div className="language-row">
+            <label htmlFor="processing-mode" className="language-label">
+              Processing:
+            </label>
+            <select
+              id="processing-mode"
+              className="language-select"
+              value={processingMode}
+              onChange={(e) => setProcessingMode(e.target.value)}
+              disabled={isLoading}
+            >
+              <option value="on-device">On-device — short audio, no credits</option>
+              <option value="cloud">Cloud — requires enabled provider credits</option>
+            </select>
+          </div>
+          <div className="language-row">
+            <label htmlFor="language-select" className="language-label">
+              Translate summary to:
+            </label>
+            <select
+              id="language-select"
+              className="language-select"
+              value={targetLanguage}
+              onChange={(e) => setTargetLanguage(e.target.value)}
+              disabled={isLoading}
+            >
+              {SUPPORTED_LANGUAGES.map((lang) => (
+                <option key={lang.value} value={lang.value}>
+                  {lang.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="processing-note">
+            On-device mode is best for recordings up to 75 seconds. The first use downloads an open Whisper model and then caches it in this browser.
+          </p>
+        </>
       )}
     </div>
   );

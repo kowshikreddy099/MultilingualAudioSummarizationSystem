@@ -37,6 +37,7 @@ function TopicsContent({ data, isStreaming }) {
           <div className="topic-item__header">
             <span className="topic-item__title">{topic.title}</span>
             <span className="timestamp-badge">
+              {topic.timing_estimated ? 'Approx. ' : ''}
               {formatSeconds(topic.start ?? 0)} – {formatSeconds(topic.end ?? 0)}
             </span>
           </div>

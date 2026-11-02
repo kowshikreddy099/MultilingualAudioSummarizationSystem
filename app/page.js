@@ -5,13 +5,14 @@ import Header from '../components/Header';
 import LoadingStages from '../components/LoadingStages';
 import ResultsPanel from '../components/ResultsPanel';
 import FileUploader from '../components/FileUploader';
+import { analyzeOnDevice } from '../lib/onDeviceAnalysis';
 
 const FEATURES = [
-  { icon: '👥', label: 'Speaker Diarization' },
+  { icon: '💻', label: 'On-device mode' },
   { icon: '🎯', label: 'Topic Segmentation' },
   { icon: '✅', label: 'Action Items' },
   { icon: '🌍', label: 'Multilingual' },
-  { icon: '⚡', label: 'Whisper V3' },
+  { icon: '🔒', label: 'Private audio option' },
   { icon: '💬', label: 'Key Quotes' },
 ];
 
@@ -43,25 +44,73 @@ function responseErrorMessage(body, status) {
 export default function HomePage() {
   const [file, setFile] = useState(null);
   const [targetLanguage, setTargetLanguage] = useState('english');
+  const [processingMode, setProcessingMode] = useState('on-device');
   const [status, setStatus] = useState('idle'); // idle | loading | done | error
   const [currentStage, setCurrentStage] = useState('uploading');
   const [sections, setSections] = useState({});
   const [videoMeta, setVideoMeta] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
+  const [noticeMessage, setNoticeMessage] = useState('');
 
   const reset = useCallback(() => {
     setSections({});
     setVideoMeta(null);
     setErrorMessage('');
+    setNoticeMessage('');
     setCurrentStage('uploading');
     setStatus('idle');
   }, []);
+
+  const runOnDeviceAnalysis = useCallback(async (fallback = false) => {
+    if (!file) return;
+
+    setSections({});
+    setVideoMeta(null);
+    setCurrentStage('downloading');
+    setNoticeMessage(
+      fallback
+        ? 'Cloud inference is unavailable, so this short recording is being processed privately on this device.'
+        : 'On-device mode downloads an open Whisper model once, then keeps the selected audio on this device.'
+    );
+
+    // Let React draw the loading stage before model loading starts on the main thread.
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const result = await analyzeOnDevice({
+      file,
+      targetLanguage,
+      onStage: setCurrentStage,
+      onProgress: setNoticeMessage,
+    });
+
+    setVideoMeta(result.meta);
+    setSections({
+      transcript: result.transcript,
+      concise_summary: result.analysis.concise_summary,
+      detailed_summary: result.analysis.detailed_summary,
+      topics: result.analysis.topics,
+      action_items: result.analysis.action_items,
+      key_quotes: result.analysis.key_quotes,
+      translation: result.analysis.translation,
+    });
+    setNoticeMessage('Analyzed on this device. The selected audio was not sent to a transcription service.');
+    setStatus('done');
+  }, [file, targetLanguage]);
 
   const handleSubmit = useCallback(async () => {
     if (!file) return;
     reset();
     setStatus('loading');
     setCurrentStage('uploading');
+
+    if (processingMode === 'on-device') {
+      try {
+        await runOnDeviceAnalysis();
+      } catch (err) {
+        setErrorMessage(err instanceof Error ? err.message : 'On-device audio analysis failed.');
+        setStatus('error');
+      }
+      return;
+    }
 
     const formData = new FormData();
     formData.append('audio', file);
@@ -111,8 +160,14 @@ export default function HomePage() {
               setSections((prev) => ({ ...prev, [data.name]: data.content }));
             }
           } else if (eventType === 'error') {
+            const message = data.message ?? 'Something went wrong.';
+            if (/no remaining credits|inference providers|\(402\)/i.test(message)) {
+              await reader.cancel();
+              await runOnDeviceAnalysis(true);
+              return;
+            }
             receivedError = true;
-            setErrorMessage(data.message ?? 'Something went wrong.');
+            setErrorMessage(message);
             setStatus('error');
             await reader.cancel();
             return;
@@ -132,7 +187,7 @@ export default function HomePage() {
         setStatus('error');
       }
     }
-  }, [file, targetLanguage, reset]);
+  }, [file, targetLanguage, processingMode, reset, runOnDeviceAnalysis]);
 
   const isActive = status === 'loading' || status === 'done' || status === 'error';
   const hasResults = Object.keys(sections).length > 0;
@@ -144,14 +199,14 @@ export default function HomePage() {
         <section className="hero" aria-labelledby="hero-title">
           <div className="hero__badge">
             <span className="hero__badge-dot" aria-hidden="true" />
-            Powered by Whisper Large V3 · Structured AI
+            On-device Whisper · Cloud analysis optional
           </div>
           <h1 className="hero__title" id="hero-title">
             Summarize Any<br />Audio File
           </h1>
           <p className="hero__subtitle">
-            Upload an MP3 or WAV file and get speaker-aware summaries when the source supports it,
-            topic segments, action items, and multilingual translation.
+            Analyze short MP3 or WAV recordings directly in your browser—no credits needed.
+            Cloud mode remains available for enhanced analysis when a provider is enabled.
           </p>
           <div className="hero__features" role="list" aria-label="Features">
             {FEATURES.map((f) => (
@@ -168,6 +223,8 @@ export default function HomePage() {
           setFile={setFile}
           targetLanguage={targetLanguage}
           setTargetLanguage={setTargetLanguage}
+          processingMode={processingMode}
+          setProcessingMode={setProcessingMode}
           onSubmit={handleSubmit}
           isLoading={false}
           compact={false}
@@ -188,6 +245,8 @@ export default function HomePage() {
           setFile={setFile}
           targetLanguage={targetLanguage}
           setTargetLanguage={setTargetLanguage}
+          processingMode={processingMode}
+          setProcessingMode={setProcessingMode}
           onSubmit={handleSubmit}
           isLoading={status === 'loading'}
           compact
@@ -199,6 +258,13 @@ export default function HomePage() {
         <div className="error-banner" role="alert">
           <span className="error-banner__icon" aria-hidden="true">⚠️</span>
           <p className="error-banner__text">{errorMessage}</p>
+        </div>
+      )}
+
+      {noticeMessage && status !== 'error' && (
+        <div className="info-banner" role="status">
+          <span aria-hidden="true">ℹ️</span>
+          <p>{noticeMessage}</p>
         </div>
       )}
 
